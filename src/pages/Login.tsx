@@ -213,44 +213,95 @@ export default function LoginPage() {
                   </div>
                 </div>
               ) : (
-                <div>
-                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل</Label>
-                  <div className="relative">
-                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input type="tel" placeholder="01012345678" className="pr-10 h-12 rounded-xl" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-sm font-medium text-foreground">رقم الموبايل</Label>
+                      {otpSent && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => { setOtpSent(false); setOtp(""); }}
+                        >
+                          تغيير الرقم
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="tel"
+                        placeholder="01012345678"
+                        className="pr-10 h-12 rounded-xl"
+                        dir="ltr"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        disabled={otpSent}
+                        required
+                      />
+                    </div>
                   </div>
+
+                  {otpSent && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-sm font-medium text-foreground">كود التحقق (6 أرقام)</Label>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={sendOtp}
+                          disabled={loading}
+                        >
+                          إعادة الإرسال
+                        </button>
+                      </div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="123456"
+                        className="h-12 rounded-xl text-center text-lg tracking-[0.5em]"
+                        dir="ltr"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        required
+                      />
+                    </motion.div>
+                  )}
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-sm font-medium text-foreground">كلمة المرور</Label>
-                   {isLogin && method === "email" && (
-                     <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-                       نسيت كلمة المرور؟
-                     </Link>
-                   )}
+              {method === "email" && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-sm font-medium text-foreground">كلمة المرور</Label>
+                    {isLogin && (
+                      <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                        نسيت كلمة المرور؟
+                      </Link>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pr-10 pl-10 h-12 rounded-xl"
+                      dir="ltr"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="pr-10 pl-10 h-12 rounded-xl"
-                    dir="ltr"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+              )}
 
               {!isLogin && method === "email" && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
@@ -267,7 +318,11 @@ export default function LoginPage() {
                   {loading ? (
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full" />
                   ) : (
-                    isLogin ? "تسجيل الدخول" : "إنشاء الحساب"
+                    method === "phone" && !otpSent
+                      ? "إرسال كود التحقق"
+                      : method === "phone" && otpSent
+                        ? "تأكيد الكود والدخول"
+                        : isLogin ? "تسجيل الدخول" : "إنشاء الحساب"
                   )}
                 </Button>
               </motion.div>
