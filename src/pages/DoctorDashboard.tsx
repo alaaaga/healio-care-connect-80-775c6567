@@ -395,6 +395,57 @@ export default function DoctorDashboardPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Prescription dialog */}
+      <Dialog open={rxOpen} onOpenChange={setRxOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pill className="w-5 h-5 text-medical-green" />
+              روشتة جديدة {rxBooking?.patient_name ? `— ${rxBooking.patient_name}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="mb-1.5 block">التشخيص</Label>
+              <Input value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} placeholder="مثلاً: التهاب حلق حاد" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>الأدوية</Label>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={addMed}>
+                  <Plus className="w-3 h-3" />إضافة دواء
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {rxMeds.map((m, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-start p-2 rounded-lg bg-muted/30">
+                    <Input className="col-span-4" placeholder="اسم الدواء" value={m.name} onChange={(e) => updateMed(idx, 'name', e.target.value)} />
+                    <Input className="col-span-3" placeholder="الجرعة" value={m.dosage} onChange={(e) => updateMed(idx, 'dosage', e.target.value)} />
+                    <Input className="col-span-4" placeholder="التعليمات" value={m.instructions} onChange={(e) => updateMed(idx, 'instructions', e.target.value)} />
+                    <Button variant="ghost" size="icon" className="col-span-1 text-destructive h-9 w-9" onClick={() => removeMed(idx)} disabled={rxMeds.length === 1}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">ملاحظات</Label>
+              <Textarea value={rxNotes} onChange={(e) => setRxNotes(e.target.value)} placeholder="ملاحظات إضافية للمريض" rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRxOpen(false)}>إلغاء</Button>
+            <Button onClick={saveRx} disabled={rxSaving} className="gradient-hero-bg text-primary-foreground">
+              {rxSaving ? "جاري الحفظ..." : "حفظ الروشتة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );
