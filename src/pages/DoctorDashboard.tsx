@@ -260,13 +260,30 @@ export default function DoctorDashboardPage() {
                             <Badge variant="outline">{b.type === "online" ? "أونلاين" : "عيادة"}</Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs gap-1">
-                                <Users className="w-3 h-3" />#{b.queue_position || '-'}
-                              </Badge>
-                              {b.estimated_wait && (
-                                <span className="text-xs text-muted-foreground">{b.estimated_wait}</span>
-                              )}
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={1}
+                                defaultValue={b.queue_position || ''}
+                                className="h-8 w-14 text-xs"
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  if (val && val !== b.queue_position) {
+                                    updateQueue(b.id, val, b.estimated_wait || `${val * 15} د`);
+                                  }
+                                }}
+                              />
+                              <Input
+                                type="text"
+                                defaultValue={b.estimated_wait || ''}
+                                placeholder="انتظار"
+                                className="h-8 w-16 text-xs"
+                                onBlur={(e) => {
+                                  if (e.target.value !== b.estimated_wait) {
+                                    updateQueue(b.id, b.queue_position || 1, e.target.value);
+                                  }
+                                }}
+                              />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -275,15 +292,20 @@ export default function DoctorDashboardPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {(b.status === "pending" || b.status === "confirmed") && (
-                              <div className="flex gap-1">
-                                {b.status === "pending" && (
-                                  <Button variant="outline" size="sm" className="text-xs text-primary" onClick={() => updateStatus(b.id, "confirmed")}>تأكيد</Button>
-                                )}
-                                <Button variant="outline" size="sm" className="text-xs text-medical-green" onClick={() => updateStatus(b.id, "completed")}>إكمال</Button>
-                                <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => updateStatus(b.id, "cancelled")}>إلغاء</Button>
-                              </div>
-                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {b.status === "pending" && (
+                                <Button variant="outline" size="sm" className="text-xs text-primary" onClick={() => updateStatus(b.id, "confirmed")}>تأكيد</Button>
+                              )}
+                              {(b.status === "pending" || b.status === "confirmed") && (
+                                <>
+                                  <Button variant="outline" size="sm" className="text-xs text-medical-green" onClick={() => updateStatus(b.id, "completed")}>إكمال</Button>
+                                  <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => updateStatus(b.id, "cancelled")}>إلغاء</Button>
+                                </>
+                              )}
+                              <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => openRxDialog(b)}>
+                                <FileText className="w-3 h-3" />روشتة
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
