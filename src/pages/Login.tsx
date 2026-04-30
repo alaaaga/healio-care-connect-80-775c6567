@@ -4,13 +4,26 @@ import { Heart, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
+type LoginMethod = "email" | "phone";
+
+// Normalize Egyptian phone numbers to E.164 (+20...)
+const normalizePhone = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("20")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+20${digits.slice(1)}`;
+  if (digits.startsWith("1") && digits.length === 10) return `+20${digits}`;
+  return digits.startsWith("+") ? digits : `+${digits}`;
+};
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [method, setMethod] = useState<LoginMethod>("email");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,20 +38,41 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (method === "email") {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const normalizedPhone = normalizePhone(phone);
+          const { error } = await supabase.auth.signInWithPassword({
+            phone: normalizedPhone,
+            password,
+          });
+          if (error) throw error;
+        }
         toast.success("تم تسجيل الدخول بنجاح! 🎉");
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
+        if (method === "email") {
+          const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { full_name: fullName, phone: phone ? normalizePhone(phone) : null },
+              emailRedirectTo: window.location.origin,
+            },
+          });
+          if (error) throw error;
+        } else {
+          const normalizedPhone = normalizePhone(phone);
+          const { error } = await supabase.auth.signUp({
+            phone: normalizedPhone,
+            password,
+            options: {
+              data: { full_name: fullName, phone: normalizedPhone },
+            },
+          });
+          if (error) throw error;
+        }
 
         toast.success("تم إنشاء الحساب بنجاح! 🎉");
         navigate("/dashboard");
