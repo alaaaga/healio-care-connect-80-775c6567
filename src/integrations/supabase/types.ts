@@ -344,6 +344,33 @@ export type Database = {
           },
         ]
       }
+      phone_otps: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          used: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone: string
+          used?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          used?: boolean
+        }
+        Relationships: []
+      }
       prescriptions: {
         Row: {
           booking_id: string
@@ -519,6 +546,7 @@ export type Database = {
           used_count: number
         }[]
       }
+      request_phone_otp: { Args: { _phone: string }; Returns: string }
       validate_coupon: {
         Args: { _amount: number; _code: string }
         Returns: {
@@ -532,6 +560,10 @@ export type Database = {
           min_amount: number
           used_count: number
         }[]
+      }
+      verify_phone_otp: {
+        Args: { _code: string; _phone: string }
+        Returns: boolean
       }
     }
     Enums: {

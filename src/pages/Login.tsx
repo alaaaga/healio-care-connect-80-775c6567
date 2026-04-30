@@ -21,6 +21,11 @@ const normalizePhone = (raw: string): string => {
   return digits.startsWith("+") ? digits : `+${digits}`;
 };
 
+// Convert normalized phone to a synthetic email for Supabase auth
+const phoneToEmail = (phoneE164: string) => `${phoneE164.replace(/\D/g, "")}@phone.medicare.local`;
+// Deterministic password derived from phone (so user only needs OTP)
+const phoneToPassword = (phoneE164: string) => `Ph-${phoneE164.replace(/\D/g, "")}-MC2026`;
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [method, setMethod] = useState<LoginMethod>("email");
@@ -30,29 +35,41 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const navigate = useNavigate();
+
+  const sendOtp = async () => {
+    if (!phone || phone.replace(/\D/g, "").length < 10) {
+      toast.error("أدخل رقم هاتف صحيح");
+      return;
+    }
+    setLoading(true);
+    try {
+      const normalizedPhone = normalizePhone(phone);
+      const { data, error } = await supabase.rpc("request_phone_otp", { _phone: normalizedPhone });
+      if (error) throw error;
+      setOtpSent(true);
+      // Dev mode: show code in toast and console
+      toast.success(`كود التحقق: ${data} (وضع تجريبي)`, { duration: 10000 });
+      console.log(`[OTP DEV] Phone ${normalizedPhone} → Code: ${data}`);
+    } catch (err: any) {
+      toast.error(err.message || "فشل إرسال الكود");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      if (isLogin) {
-        if (method === "email") {
+      if (method === "email") {
+        if (isLogin) {
           const { error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
         } else {
-          const normalizedPhone = normalizePhone(phone);
-          const { error } = await supabase.auth.signInWithPassword({
-            phone: normalizedPhone,
-            password,
-          });
-          if (error) throw error;
-        }
-        toast.success("تم تسجيل الدخول بنجاح! 🎉");
-        navigate("/dashboard");
-      } else {
-        if (method === "email") {
           const { error } = await supabase.auth.signUp({
             email,
             password,
@@ -62,19 +79,65 @@ export default function LoginPage() {
             },
           });
           if (error) throw error;
-        } else {
-          const normalizedPhone = normalizePhone(phone);
-          const { error } = await supabase.auth.signUp({
-            phone: normalizedPhone,
-            password,
-            options: {
-              data: { full_name: fullName, phone: normalizedPhone },
-            },
-          });
-          if (error) throw error;
+        }
+        toast.success(isLogin ? "تم تسجيل الدخول بنجاح! 🎉" : "تم إنشاء الحساب بنجاح! 🎉");
+        navigate("/dashboard");
+      } else {
+        // Phone flow with OTP
+        if (!otpSent) {
+          await sendOtp();
+          return;
+        }
+        if (!otp || otp.length !== 6) {
+          toast.error("أدخل كود التحقق المكون من 6 أرقام");
+          return;
+        }
+        const normalizedPhone = normalizePhone(phone);
+        const { data: verified, error: verifyError } = await supabase.rpc("verify_phone_otp", {
+          _phone: normalizedPhone,
+          _code: otp,
+        });
+        if (verifyError) throw verifyError;
+        if (!verified) {
+          toast.error("الكود غير صحيح أو منتهي الصلاحية");
+          return;
         }
 
-        toast.success("تم إنشاء الحساب بنجاح! 🎉");
+        const syntheticEmail = phoneToEmail(normalizedPhone);
+        const syntheticPassword = phoneToPassword(normalizedPhone);
+
+        // Try sign in first; if fails, sign up
+        let { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: syntheticEmail,
+          password: syntheticPassword,
+        });
+
+        if (signInErr) {
+          if (isLogin) {
+            // No account exists — create it on the fly
+            const { error: signUpErr } = await supabase.auth.signUp({
+              email: syntheticEmail,
+              password: syntheticPassword,
+              options: {
+                data: { full_name: fullName || `مستخدم ${normalizedPhone.slice(-4)}`, phone: normalizedPhone },
+                emailRedirectTo: window.location.origin,
+              },
+            });
+            if (signUpErr) throw signUpErr;
+          } else {
+            const { error: signUpErr } = await supabase.auth.signUp({
+              email: syntheticEmail,
+              password: syntheticPassword,
+              options: {
+                data: { full_name: fullName, phone: normalizedPhone },
+                emailRedirectTo: window.location.origin,
+              },
+            });
+            if (signUpErr) throw signUpErr;
+          }
+        }
+
+        toast.success("تم التحقق وتسجيل الدخول بنجاح! 🎉");
         navigate("/dashboard");
       }
     } catch (error: any) {
@@ -150,44 +213,95 @@ export default function LoginPage() {
                   </div>
                 </div>
               ) : (
-                <div>
-                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل</Label>
-                  <div className="relative">
-                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input type="tel" placeholder="01012345678" className="pr-10 h-12 rounded-xl" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-sm font-medium text-foreground">رقم الموبايل</Label>
+                      {otpSent && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => { setOtpSent(false); setOtp(""); }}
+                        >
+                          تغيير الرقم
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="tel"
+                        placeholder="01012345678"
+                        className="pr-10 h-12 rounded-xl"
+                        dir="ltr"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        disabled={otpSent}
+                        required
+                      />
+                    </div>
                   </div>
+
+                  {otpSent && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <Label className="text-sm font-medium text-foreground">كود التحقق (6 أرقام)</Label>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={sendOtp}
+                          disabled={loading}
+                        >
+                          إعادة الإرسال
+                        </button>
+                      </div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="123456"
+                        className="h-12 rounded-xl text-center text-lg tracking-[0.5em]"
+                        dir="ltr"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        required
+                      />
+                    </motion.div>
+                  )}
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-sm font-medium text-foreground">كلمة المرور</Label>
-                   {isLogin && method === "email" && (
-                     <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-                       نسيت كلمة المرور؟
-                     </Link>
-                   )}
+              {method === "email" && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-sm font-medium text-foreground">كلمة المرور</Label>
+                    {isLogin && (
+                      <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                        نسيت كلمة المرور؟
+                      </Link>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pr-10 pl-10 h-12 rounded-xl"
+                      dir="ltr"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="pr-10 pl-10 h-12 rounded-xl"
-                    dir="ltr"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+              )}
 
               {!isLogin && method === "email" && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
@@ -204,7 +318,11 @@ export default function LoginPage() {
                   {loading ? (
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full" />
                   ) : (
-                    isLogin ? "تسجيل الدخول" : "إنشاء الحساب"
+                    method === "phone" && !otpSent
+                      ? "إرسال كود التحقق"
+                      : method === "phone" && otpSent
+                        ? "تأكيد الكود والدخول"
+                        : isLogin ? "تسجيل الدخول" : "إنشاء الحساب"
                   )}
                 </Button>
               </motion.div>
