@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  Calendar, Clock, User, LogOut, CheckCircle2, XCircle, AlertCircle, Stethoscope, Users, Pill, Download
+  Calendar, Clock, User, LogOut, CheckCircle2, XCircle, AlertCircle, Stethoscope, Users, Pill, Download, Plus, Trash2, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -109,7 +113,71 @@ export default function DoctorDashboardPage() {
     if (!error) {
       setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
       toast.success("تم تحديث حالة الحجز");
+    } else {
+      toast.error("فشل تحديث الحالة");
     }
+  };
+
+  const updateQueue = async (id: string, queue_position: number, estimated_wait: string) => {
+    const { error } = await supabase
+      .from("bookings")
+      .update({ queue_position, estimated_wait })
+      .eq("id", id);
+    if (!error) {
+      setBookings((prev) => prev.map((b) => b.id === id ? { ...b, queue_position, estimated_wait } : b));
+      toast.success("تم تحديث الطابور");
+    } else {
+      toast.error("فشل تحديث الطابور");
+    }
+  };
+
+  // Prescription dialog state
+  const [rxOpen, setRxOpen] = useState(false);
+  const [rxBooking, setRxBooking] = useState<any>(null);
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxNotes, setRxNotes] = useState("");
+  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
+    { name: "", dosage: "", instructions: "" },
+  ]);
+  const [rxSaving, setRxSaving] = useState(false);
+
+  const openRxDialog = (booking: any) => {
+    setRxBooking(booking);
+    setRxDiagnosis("");
+    setRxNotes("");
+    setRxMeds([{ name: "", dosage: "", instructions: "" }]);
+    setRxOpen(true);
+  };
+
+  const addMed = () => setRxMeds((prev) => [...prev, { name: "", dosage: "", instructions: "" }]);
+  const removeMed = (idx: number) => setRxMeds((prev) => prev.filter((_, i) => i !== idx));
+  const updateMed = (idx: number, field: string, value: string) =>
+    setRxMeds((prev) => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
+
+  const saveRx = async () => {
+    if (!rxBooking || !doctorProfile) return;
+    const validMeds = rxMeds.filter((m) => m.name.trim());
+    if (validMeds.length === 0) {
+      toast.error("أضف دواء واحد على الأقل");
+      return;
+    }
+    setRxSaving(true);
+    const { data, error } = await supabase.from("prescriptions").insert({
+      booking_id: rxBooking.id,
+      doctor_id: doctorProfile.id,
+      patient_id: rxBooking.user_id,
+      diagnosis: rxDiagnosis,
+      notes: rxNotes,
+      medications: validMeds,
+    }).select().single();
+    setRxSaving(false);
+    if (error) {
+      toast.error("فشل حفظ الروشتة: " + error.message);
+      return;
+    }
+    setPrescriptions((prev) => [{ ...data, patient_name: rxBooking.patient_name }, ...prev]);
+    toast.success("تم حفظ الروشتة ✅");
+    setRxOpen(false);
   };
 
   return (
@@ -192,13 +260,30 @@ export default function DoctorDashboardPage() {
                             <Badge variant="outline">{b.type === "online" ? "أونلاين" : "عيادة"}</Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs gap-1">
-                                <Users className="w-3 h-3" />#{b.queue_position || '-'}
-                              </Badge>
-                              {b.estimated_wait && (
-                                <span className="text-xs text-muted-foreground">{b.estimated_wait}</span>
-                              )}
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={1}
+                                defaultValue={b.queue_position || ''}
+                                className="h-8 w-14 text-xs"
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  if (val && val !== b.queue_position) {
+                                    updateQueue(b.id, val, b.estimated_wait || `${val * 15} د`);
+                                  }
+                                }}
+                              />
+                              <Input
+                                type="text"
+                                defaultValue={b.estimated_wait || ''}
+                                placeholder="انتظار"
+                                className="h-8 w-16 text-xs"
+                                onBlur={(e) => {
+                                  if (e.target.value !== b.estimated_wait) {
+                                    updateQueue(b.id, b.queue_position || 1, e.target.value);
+                                  }
+                                }}
+                              />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -207,15 +292,20 @@ export default function DoctorDashboardPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {(b.status === "pending" || b.status === "confirmed") && (
-                              <div className="flex gap-1">
-                                {b.status === "pending" && (
-                                  <Button variant="outline" size="sm" className="text-xs text-primary" onClick={() => updateStatus(b.id, "confirmed")}>تأكيد</Button>
-                                )}
-                                <Button variant="outline" size="sm" className="text-xs text-medical-green" onClick={() => updateStatus(b.id, "completed")}>إكمال</Button>
-                                <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => updateStatus(b.id, "cancelled")}>إلغاء</Button>
-                              </div>
-                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {b.status === "pending" && (
+                                <Button variant="outline" size="sm" className="text-xs text-primary" onClick={() => updateStatus(b.id, "confirmed")}>تأكيد</Button>
+                              )}
+                              {(b.status === "pending" || b.status === "confirmed") && (
+                                <>
+                                  <Button variant="outline" size="sm" className="text-xs text-medical-green" onClick={() => updateStatus(b.id, "completed")}>إكمال</Button>
+                                  <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => updateStatus(b.id, "cancelled")}>إلغاء</Button>
+                                </>
+                              )}
+                              <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => openRxDialog(b)}>
+                                <FileText className="w-3 h-3" />روشتة
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -305,6 +395,57 @@ export default function DoctorDashboardPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Prescription dialog */}
+      <Dialog open={rxOpen} onOpenChange={setRxOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pill className="w-5 h-5 text-medical-green" />
+              روشتة جديدة {rxBooking?.patient_name ? `— ${rxBooking.patient_name}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="mb-1.5 block">التشخيص</Label>
+              <Input value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} placeholder="مثلاً: التهاب حلق حاد" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>الأدوية</Label>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={addMed}>
+                  <Plus className="w-3 h-3" />إضافة دواء
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {rxMeds.map((m, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-start p-2 rounded-lg bg-muted/30">
+                    <Input className="col-span-4" placeholder="اسم الدواء" value={m.name} onChange={(e) => updateMed(idx, 'name', e.target.value)} />
+                    <Input className="col-span-3" placeholder="الجرعة" value={m.dosage} onChange={(e) => updateMed(idx, 'dosage', e.target.value)} />
+                    <Input className="col-span-4" placeholder="التعليمات" value={m.instructions} onChange={(e) => updateMed(idx, 'instructions', e.target.value)} />
+                    <Button variant="ghost" size="icon" className="col-span-1 text-destructive h-9 w-9" onClick={() => removeMed(idx)} disabled={rxMeds.length === 1}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">ملاحظات</Label>
+              <Textarea value={rxNotes} onChange={(e) => setRxNotes(e.target.value)} placeholder="ملاحظات إضافية للمريض" rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRxOpen(false)}>إلغاء</Button>
+            <Button onClick={saveRx} disabled={rxSaving} className="gradient-hero-bg text-primary-foreground">
+              {rxSaving ? "جاري الحفظ..." : "حفظ الروشتة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Footer />
     </div>
   );

@@ -503,6 +503,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_doctor_for_booking: { Args: { _booking_id: string }; Returns: boolean }
+      is_doctor_owner: { Args: { _doctor_id: string }; Returns: boolean }
       redeem_coupon: {
         Args: { _amount: number; _code: string }
         Returns: {

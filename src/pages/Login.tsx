@@ -4,13 +4,26 @@ import { Heart, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
+type LoginMethod = "email" | "phone";
+
+// Normalize Egyptian phone numbers to E.164 (+20...)
+const normalizePhone = (raw: string): string => {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("20")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+20${digits.slice(1)}`;
+  if (digits.startsWith("1") && digits.length === 10) return `+20${digits}`;
+  return digits.startsWith("+") ? digits : `+${digits}`;
+};
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [method, setMethod] = useState<LoginMethod>("email");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,20 +38,41 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (method === "email") {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const normalizedPhone = normalizePhone(phone);
+          const { error } = await supabase.auth.signInWithPassword({
+            phone: normalizedPhone,
+            password,
+          });
+          if (error) throw error;
+        }
         toast.success("تم تسجيل الدخول بنجاح! 🎉");
         navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
+        if (method === "email") {
+          const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { full_name: fullName, phone: phone ? normalizePhone(phone) : null },
+              emailRedirectTo: window.location.origin,
+            },
+          });
+          if (error) throw error;
+        } else {
+          const normalizedPhone = normalizePhone(phone);
+          const { error } = await supabase.auth.signUp({
+            phone: normalizedPhone,
+            password,
+            options: {
+              data: { full_name: fullName, phone: normalizedPhone },
+            },
+          });
+          if (error) throw error;
+        }
 
         toast.success("تم إنشاء الحساب بنجاح! 🎉");
         navigate("/dashboard");
@@ -85,6 +119,18 @@ export default function LoginPage() {
             </p>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
+              {/* Method tabs */}
+              <Tabs value={method} onValueChange={(v) => setMethod(v as LoginMethod)}>
+                <TabsList className="grid w-full grid-cols-2 h-11 rounded-xl">
+                  <TabsTrigger value="email" className="gap-1.5 rounded-lg">
+                    <Mail className="w-4 h-4" /> إيميل
+                  </TabsTrigger>
+                  <TabsTrigger value="phone" className="gap-1.5 rounded-lg">
+                    <Phone className="w-4 h-4" /> هاتف
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               {!isLogin && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
                   <Label className="text-sm font-medium text-foreground mb-1.5 block">الاسم الكامل</Label>
@@ -95,18 +141,28 @@ export default function LoginPage() {
                 </motion.div>
               )}
 
-              <div>
-                <Label className="text-sm font-medium text-foreground mb-1.5 block">البريد الإلكتروني</Label>
-                <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="email" placeholder="example@email.com" className="pr-10 h-12 rounded-xl" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              {method === "email" ? (
+                <div>
+                  <Label className="text-sm font-medium text-foreground mb-1.5 block">البريد الإلكتروني</Label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input type="email" placeholder="example@email.com" className="pr-10 h-12 rounded-xl" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل</Label>
+                  <div className="relative">
+                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input type="tel" placeholder="01012345678" className="pr-10 h-12 rounded-xl" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <Label className="text-sm font-medium text-foreground">كلمة المرور</Label>
-                   {isLogin && (
+                   {isLogin && method === "email" && (
                      <Link to="/forgot-password" className="text-xs text-primary hover:underline">
                        نسيت كلمة المرور؟
                      </Link>
@@ -133,9 +189,9 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {!isLogin && (
+              {!isLogin && method === "email" && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
-                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل</Label>
+                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل (اختياري)</Label>
                   <div className="relative">
                     <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input type="tel" placeholder="01012345678" className="pr-10 h-12 rounded-xl" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} />
