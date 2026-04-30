@@ -113,7 +113,71 @@ export default function DoctorDashboardPage() {
     if (!error) {
       setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
       toast.success("تم تحديث حالة الحجز");
+    } else {
+      toast.error("فشل تحديث الحالة");
     }
+  };
+
+  const updateQueue = async (id: string, queue_position: number, estimated_wait: string) => {
+    const { error } = await supabase
+      .from("bookings")
+      .update({ queue_position, estimated_wait })
+      .eq("id", id);
+    if (!error) {
+      setBookings((prev) => prev.map((b) => b.id === id ? { ...b, queue_position, estimated_wait } : b));
+      toast.success("تم تحديث الطابور");
+    } else {
+      toast.error("فشل تحديث الطابور");
+    }
+  };
+
+  // Prescription dialog state
+  const [rxOpen, setRxOpen] = useState(false);
+  const [rxBooking, setRxBooking] = useState<any>(null);
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxNotes, setRxNotes] = useState("");
+  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
+    { name: "", dosage: "", instructions: "" },
+  ]);
+  const [rxSaving, setRxSaving] = useState(false);
+
+  const openRxDialog = (booking: any) => {
+    setRxBooking(booking);
+    setRxDiagnosis("");
+    setRxNotes("");
+    setRxMeds([{ name: "", dosage: "", instructions: "" }]);
+    setRxOpen(true);
+  };
+
+  const addMed = () => setRxMeds((prev) => [...prev, { name: "", dosage: "", instructions: "" }]);
+  const removeMed = (idx: number) => setRxMeds((prev) => prev.filter((_, i) => i !== idx));
+  const updateMed = (idx: number, field: string, value: string) =>
+    setRxMeds((prev) => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
+
+  const saveRx = async () => {
+    if (!rxBooking || !doctorProfile) return;
+    const validMeds = rxMeds.filter((m) => m.name.trim());
+    if (validMeds.length === 0) {
+      toast.error("أضف دواء واحد على الأقل");
+      return;
+    }
+    setRxSaving(true);
+    const { data, error } = await supabase.from("prescriptions").insert({
+      booking_id: rxBooking.id,
+      doctor_id: doctorProfile.id,
+      patient_id: rxBooking.user_id,
+      diagnosis: rxDiagnosis,
+      notes: rxNotes,
+      medications: validMeds,
+    }).select().single();
+    setRxSaving(false);
+    if (error) {
+      toast.error("فشل حفظ الروشتة: " + error.message);
+      return;
+    }
+    setPrescriptions((prev) => [{ ...data, patient_name: rxBooking.patient_name }, ...prev]);
+    toast.success("تم حفظ الروشتة ✅");
+    setRxOpen(false);
   };
 
   return (
