@@ -68,18 +68,29 @@ export default function ProfilePage() {
     toast.success("تم تحديث الصورة");
   };
 
+  const normalizePhone = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.startsWith("20")) return `+${digits}`;
+    if (digits.startsWith("0")) return `+20${digits.slice(1)}`;
+    if (digits.startsWith("1") && digits.length === 10) return `+20${digits}`;
+    return raw.startsWith("+") ? raw : `+${digits}`;
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
+    const normalizedPhone = phone.trim() ? normalizePhone(phone.trim()) : "";
     const { error } = await supabase.from("profiles").update({
       full_name: fullName.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
     }).eq("user_id", user.id);
     setSaving(false);
     if (error) {
       toast.error("حدث خطأ في الحفظ");
     } else {
-      toast.success("تم حفظ البيانات بنجاح");
+      setPhone(normalizedPhone);
+      toast.success("تم حفظ البيانات بنجاح — يمكنك الآن الدخول بالإيميل أو الهاتف");
     }
   };
 
