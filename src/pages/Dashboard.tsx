@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Calendar, Clock, User, LogOut, Bell, CheckCircle2, XCircle, AlertCircle, Timer, Users, Pill, Download, Navigation, Star, Settings
+  Calendar, Clock, User, LogOut, Bell, CheckCircle2, XCircle, AlertCircle, Timer, Users, Pill, Download, Navigation, Star, Settings, Stethoscope
 } from "lucide-react";
 import ReviewDialog from "@/components/ReviewDialog";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ function generatePrescriptionPDF(pr: any, userName: string) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signOut, isDoctor } = useAuth();
   const [activeTab, setActiveTab] = useState("bookings");
   const [bookings, setBookings] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -160,7 +160,14 @@ export default function DashboardPage() {
                 </h1>
                 <p className="text-muted-foreground mt-1">تابع مواعيدك وتفاصيل حجوزاتك من هنا</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {isDoctor && (
+                  <Link to="/doctor-dashboard">
+                    <Button className="gap-2 bg-medical-green text-white hover:bg-medical-green/90">
+                      <Stethoscope className="w-4 h-4" />لوحة الطبيب
+                    </Button>
+                  </Link>
+                )}
                 <Link to="/booking">
                   <Button className="gradient-hero-bg text-primary-foreground border-0 shadow-lg shadow-primary/25 gap-2">
                     <Calendar className="w-4 h-4" />حجز موعد جديد
