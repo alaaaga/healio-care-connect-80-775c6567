@@ -160,7 +160,14 @@ export default function DashboardPage() {
                 </h1>
                 <p className="text-muted-foreground mt-1">تابع مواعيدك وتفاصيل حجوزاتك من هنا</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {isDoctor && (
+                  <Link to="/doctor-dashboard">
+                    <Button className="gap-2 bg-medical-green text-white hover:bg-medical-green/90">
+                      <Stethoscope className="w-4 h-4" />لوحة الطبيب
+                    </Button>
+                  </Link>
+                )}
                 <Link to="/booking">
                   <Button className="gradient-hero-bg text-primary-foreground border-0 shadow-lg shadow-primary/25 gap-2">
                     <Calendar className="w-4 h-4" />حجز موعد جديد
