@@ -21,11 +21,6 @@ const normalizePhone = (raw: string): string => {
   return digits.startsWith("+") ? digits : `+${digits}`;
 };
 
-// Convert normalized phone to a synthetic email for Supabase auth
-const phoneToEmail = (phoneE164: string) => `${phoneE164.replace(/\D/g, "")}@phone.medicare.local`;
-// Deterministic password derived from phone (so user only needs OTP)
-const phoneToPassword = (phoneE164: string) => `Ph-${phoneE164.replace(/\D/g, "")}-MC2026`;
-
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [method, setMethod] = useState<LoginMethod>("email");
@@ -50,7 +45,6 @@ export default function LoginPage() {
       const { data, error } = await supabase.rpc("request_phone_otp", { _phone: normalizedPhone });
       if (error) throw error;
       setOtpSent(true);
-      // Dev mode: show code in toast and console
       toast.success(`كود التحقق: ${data} (وضع تجريبي)`, { duration: 10000 });
       console.log(`[OTP DEV] Phone ${normalizedPhone} → Code: ${data}`);
     } catch (err: any) {
@@ -70,15 +64,24 @@ export default function LoginPage() {
           const { error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
         } else {
+          const normalizedPhoneVal = phone ? normalizePhone(phone) : null;
           const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-              data: { full_name: fullName, phone: phone ? normalizePhone(phone) : null },
+              data: { full_name: fullName, phone: normalizedPhoneVal },
               emailRedirectTo: window.location.origin,
             },
           });
           if (error) throw error;
+
+          // If phone provided during email registration, link it to profile
+          if (normalizedPhoneVal) {
+            // The profile will be created by trigger; we update phone via edge function
+            supabase.functions.invoke("phone-auth", {
+              body: { action: "link_phone", email, phone: normalizedPhoneVal },
+            }).catch(() => {}); // non-blocking
+          }
         }
         toast.success(isLogin ? "تم تسجيل الدخول بنجاح! 🎉" : "تم إنشاء الحساب بنجاح! 🎉");
         navigate("/dashboard");
@@ -93,48 +96,59 @@ export default function LoginPage() {
           return;
         }
         const normalizedPhone = normalizePhone(phone);
-        const { data: verified, error: verifyError } = await supabase.rpc("verify_phone_otp", {
-          _phone: normalizedPhone,
-          _code: otp,
-        });
-        if (verifyError) throw verifyError;
-        if (!verified) {
-          toast.error("الكود غير صحيح أو منتهي الصلاحية");
-          return;
-        }
 
-        const syntheticEmail = phoneToEmail(normalizedPhone);
-        const syntheticPassword = phoneToPassword(normalizedPhone);
+        if (isLogin) {
+          // Login with phone: edge function verifies OTP and returns magic link token
+          const { data: result, error: fnErr } = await supabase.functions.invoke("phone-auth", {
+            body: { action: "login_with_phone", phone: normalizedPhone, code: otp },
+          });
 
-        // Try sign in first; if fails, sign up
-        let { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: syntheticEmail,
-          password: syntheticPassword,
-        });
-
-        if (signInErr) {
-          if (isLogin) {
-            // No account exists — create it on the fly
-            const { error: signUpErr } = await supabase.auth.signUp({
-              email: syntheticEmail,
-              password: syntheticPassword,
-              options: {
-                data: { full_name: fullName || `مستخدم ${normalizedPhone.slice(-4)}`, phone: normalizedPhone },
-                emailRedirectTo: window.location.origin,
-              },
-            });
-            if (signUpErr) throw signUpErr;
-          } else {
-            const { error: signUpErr } = await supabase.auth.signUp({
-              email: syntheticEmail,
-              password: syntheticPassword,
-              options: {
-                data: { full_name: fullName, phone: normalizedPhone },
-                emailRedirectTo: window.location.origin,
-              },
-            });
-            if (signUpErr) throw signUpErr;
+          if (fnErr) throw fnErr;
+          if (result?.error === "no_account_for_phone") {
+            toast.error("لا يوجد حساب مرتبط بهذا الرقم. سجل حساب جديد أولاً أو أضف رقمك في ملفك الشخصي.");
+            return;
           }
+          if (result?.error === "invalid_otp") {
+            toast.error("الكود غير صحيح أو منتهي الصلاحية");
+            return;
+          }
+          if (result?.error) throw new Error(result.error);
+
+          // Use the token_hash to verify and get session
+          const { error: verifyErr } = await supabase.auth.verifyOtp({
+            email: result.email,
+            token: result.token_hash,
+            type: "magiclink",
+          });
+          if (verifyErr) throw verifyErr;
+        } else {
+          // Register with phone: create account via edge function
+          const { data: result, error: fnErr } = await supabase.functions.invoke("phone-auth", {
+            body: {
+              action: "register_with_phone",
+              phone: normalizedPhone,
+              code: otp,
+              full_name: fullName || `مستخدم ${normalizedPhone.slice(-4)}`,
+            },
+          });
+
+          if (fnErr) throw fnErr;
+          if (result?.error === "phone_already_registered") {
+            toast.error("هذا الرقم مسجل بالفعل. جرب تسجيل الدخول.");
+            return;
+          }
+          if (result?.error === "invalid_otp") {
+            toast.error("الكود غير صحيح أو منتهي الصلاحية");
+            return;
+          }
+          if (result?.error) throw new Error(result.error);
+
+          const { error: verifyErr } = await supabase.auth.verifyOtp({
+            email: result.email,
+            token: result.token_hash,
+            type: "magiclink",
+          });
+          if (verifyErr) throw verifyErr;
         }
 
         toast.success("تم التحقق وتسجيل الدخول بنجاح! 🎉");
@@ -183,7 +197,7 @@ export default function LoginPage() {
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               {/* Method tabs */}
-              <Tabs value={method} onValueChange={(v) => setMethod(v as LoginMethod)}>
+              <Tabs value={method} onValueChange={(v) => { setMethod(v as LoginMethod); setOtpSent(false); setOtp(""); }}>
                 <TabsList className="grid w-full grid-cols-2 h-11 rounded-xl">
                   <TabsTrigger value="email" className="gap-1.5 rounded-lg">
                     <Mail className="w-4 h-4" /> إيميل
@@ -305,11 +319,12 @@ export default function LoginPage() {
 
               {!isLogin && method === "email" && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
-                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل (اختياري)</Label>
+                  <Label className="text-sm font-medium text-foreground mb-1.5 block">رقم الموبايل (اختياري — للدخول بالهاتف لاحقاً)</Label>
                   <div className="relative">
                     <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input type="tel" placeholder="01012345678" className="pr-10 h-12 rounded-xl" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">أضف رقمك لتتمكن من الدخول بالإيميل أو الهاتف</p>
                 </motion.div>
               )}
 
@@ -360,7 +375,7 @@ export default function LoginPage() {
             <p className="text-center text-sm text-muted-foreground mt-8">
               {isLogin ? "مالكش حساب؟" : "عندك حساب بالفعل؟"}{" "}
               <button
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => { setIsLogin(!isLogin); setOtpSent(false); setOtp(""); }}
                 className="text-primary font-medium hover:underline"
               >
                 {isLogin ? "سجل الآن" : "سجل دخولك"}
@@ -382,18 +397,12 @@ export default function LoginPage() {
           transition={{ duration: 12, repeat: Infinity }}
           className="absolute bottom-20 left-20 w-80 h-80 rounded-full bg-primary-foreground/5 blur-2xl"
         />
-        <motion.div animate={{ y: [0, -20, 0] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-[15%] left-[20%] text-5xl opacity-30">🩺</motion.div>
-        <motion.div animate={{ y: [0, 15, 0] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} className="absolute bottom-[25%] right-[15%] text-4xl opacity-20">💊</motion.div>
-        <motion.div animate={{ y: [0, -15, 0] }} transition={{ duration: 6, repeat: Infinity, delay: 2 }} className="absolute top-[60%] left-[60%] text-3xl opacity-25">🏥</motion.div>
-
-        <div className="relative z-10 text-center text-primary-foreground max-w-md">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <div className="w-20 h-20 rounded-2xl bg-primary-foreground/20 flex items-center justify-center mx-auto mb-6">
-              <Heart className="w-10 h-10" />
-            </div>
-            <h2 className="font-display text-3xl font-bold mb-4">صحتك أمانة عندنا</h2>
-            <p className="text-primary-foreground/80 leading-relaxed">
-              أكثر من ٥٠,٠٠٠ مريض وثقوا فينا. انضم لعائلة ميديكير واستمتع برعاية صحية متميزة في مصر.
+        <div className="relative z-10 text-center text-primary-foreground">
+          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
+            <Heart className="w-16 h-16 mx-auto mb-6 opacity-80" />
+            <h2 className="font-display text-3xl font-bold mb-4">صحتك أولويتنا</h2>
+            <p className="text-lg opacity-80 max-w-sm mx-auto">
+              احجز مع أفضل الأطباء في مصر بسهولة وأمان
             </p>
           </motion.div>
         </div>
