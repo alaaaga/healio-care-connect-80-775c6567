@@ -59,7 +59,7 @@ function generatePrescriptionPDF(pr: any, userName: string) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signOut, isDoctor } = useAuth();
   const [activeTab, setActiveTab] = useState("bookings");
   const [bookings, setBookings] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
