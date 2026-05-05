@@ -114,6 +114,7 @@ export default function DoctorDashboardPage() {
   ]);
   const [rxSaving, setRxSaving] = useState(false);
 
+  useEffect(() => {
     if (!authLoading && (!user || !isDoctor || !doctorProfile)) {
       navigate("/dashboard");
       toast.error("هذه الصفحة مخصصة للأطباء فقط");
