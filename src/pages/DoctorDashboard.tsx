@@ -27,7 +27,74 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
   cancelled: { label: "ملغي", color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle },
 };
 
-export default function DoctorDashboardPage() {
+function DoctorProfileEdit({ doctorProfile, userEmail, userPhone }: { doctorProfile: any; userEmail: string; userPhone: string }) {
+  const [location, setLocation] = useState(doctorProfile.location || "");
+  const [bio, setBio] = useState(doctorProfile.bio || "");
+  const [price, setPrice] = useState(String(doctorProfile.price || 0));
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("doctors").update({
+      location,
+      bio,
+      price: parseInt(price) || 0,
+    }).eq("id", doctorProfile.id);
+    setSaving(false);
+    if (error) {
+      toast.error("فشل حفظ البيانات");
+    } else {
+      toast.success("تم تحديث بيانات الطبيب ✅");
+    }
+  };
+
+  return (
+    <div className="glass-card rounded-2xl p-6 max-w-lg space-y-5">
+      <div className="flex items-center gap-4 mb-2">
+        {doctorProfile.image_url ? (
+          <img src={doctorProfile.image_url} alt={doctorProfile.name} className="w-16 h-16 rounded-2xl object-cover" />
+        ) : (
+          <div className="w-16 h-16 rounded-2xl gradient-hero-bg flex items-center justify-center">
+            <Stethoscope className="w-8 h-8 text-primary-foreground" />
+          </div>
+        )}
+        <div>
+          <h3 className="font-display font-bold text-lg text-foreground">د. {doctorProfile.name}</h3>
+          <p className="text-sm text-primary">{doctorProfile.specialty}</p>
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-sm text-muted-foreground mb-1.5 block">الموقع / العنوان</Label>
+        <Input value={location} onChange={(e) => setLocation(e.target.value)} className="bg-muted/50" />
+      </div>
+      <div>
+        <Label className="text-sm text-muted-foreground mb-1.5 block">النبذة التعريفية</Label>
+        <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="bg-muted/50" />
+      </div>
+      <div>
+        <Label className="text-sm text-muted-foreground mb-1.5 block">سعر الكشف (جنيه)</Label>
+        <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="bg-muted/50 w-32" />
+      </div>
+      <div className="space-y-2 pt-2 border-t border-border/50">
+        {[
+          { label: "التقييم", value: `${doctorProfile.rating} ⭐` },
+          { label: "البريد الإلكتروني", value: userEmail },
+          { label: "الموبايل", value: userPhone || "غير محدد" },
+        ].map((f) => (
+          <div key={f.label} className="flex justify-between items-center py-2">
+            <span className="text-xs text-muted-foreground">{f.label}</span>
+            <span className="text-sm font-medium text-foreground">{f.value}</span>
+          </div>
+        ))}
+      </div>
+      <Button onClick={handleSave} disabled={saving} className="gradient-hero-bg text-primary-foreground border-0 gap-2">
+        <Save className="w-4 h-4" />
+        {saving ? "جاري الحفظ..." : "حفظ التغييرات"}
+      </Button>
+    </div>
+  );
+}
   const navigate = useNavigate();
   const { user, isDoctor, doctorProfile, profile, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("bookings");
