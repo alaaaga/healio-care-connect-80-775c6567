@@ -104,7 +104,16 @@ export default function DoctorDashboardPage() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  useEffect(() => {
+  // Prescription dialog state (must be before early returns)
+  const [rxOpen, setRxOpen] = useState(false);
+  const [rxBooking, setRxBooking] = useState<any>(null);
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxNotes, setRxNotes] = useState("");
+  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
+    { name: "", dosage: "", instructions: "" },
+  ]);
+  const [rxSaving, setRxSaving] = useState(false);
+
     if (!authLoading && (!user || !isDoctor || !doctorProfile)) {
       navigate("/dashboard");
       toast.error("هذه الصفحة مخصصة للأطباء فقط");
