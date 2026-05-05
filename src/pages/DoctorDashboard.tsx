@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  Calendar, Clock, User, LogOut, CheckCircle2, XCircle, AlertCircle, Stethoscope, Users, Pill, Download, Plus, Trash2, FileText
+  Calendar, Clock, User, LogOut, CheckCircle2, XCircle, AlertCircle, Stethoscope, Users, Pill, Download, Plus, Trash2, FileText, Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
