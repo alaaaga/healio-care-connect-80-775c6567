@@ -362,35 +362,7 @@ export default function DoctorDashboardPage() {
             </TabsContent>
 
             <TabsContent value="profile">
-              <div className="glass-card rounded-2xl p-6 max-w-lg">
-                <div className="flex items-center gap-4 mb-6">
-                  {doctorProfile.image_url ? (
-                    <img src={doctorProfile.image_url} alt={doctorProfile.name} className="w-16 h-16 rounded-2xl object-cover" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-2xl gradient-hero-bg flex items-center justify-center">
-                      <Stethoscope className="w-8 h-8 text-primary-foreground" />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-foreground">د. {doctorProfile.name}</h3>
-                    <p className="text-sm text-primary">{doctorProfile.specialty}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {[
-                    { label: "الموقع", value: doctorProfile.location },
-                    { label: "سعر الكشف", value: `${doctorProfile.price} جنيه` },
-                    { label: "التقييم", value: `${doctorProfile.rating} ⭐` },
-                    { label: "البريد الإلكتروني", value: user?.email || "" },
-                    { label: "الموبايل", value: profile?.phone || "غير محدد" },
-                  ].map((field) => (
-                    <div key={field.label} className="flex justify-between items-center py-3 border-b border-border/50 last:border-0">
-                      <span className="text-sm text-muted-foreground">{field.label}</span>
-                      <span className="text-sm font-medium text-foreground">{field.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <DoctorProfileEdit doctorProfile={doctorProfile} userEmail={user?.email || ""} userPhone={profile?.phone || ""} />
             </TabsContent>
           </Tabs>
         </div>
