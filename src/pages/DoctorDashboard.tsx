@@ -95,6 +95,8 @@ function DoctorProfileEdit({ doctorProfile, userEmail, userPhone }: { doctorProf
     </div>
   );
 }
+
+export default function DoctorDashboardPage() {
   const navigate = useNavigate();
   const { user, isDoctor, doctorProfile, profile, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("bookings");
