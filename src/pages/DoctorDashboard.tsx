@@ -104,6 +104,16 @@ export default function DoctorDashboardPage() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
+  // Prescription dialog state (must be before early returns)
+  const [rxOpen, setRxOpen] = useState(false);
+  const [rxBooking, setRxBooking] = useState<any>(null);
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxNotes, setRxNotes] = useState("");
+  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
+    { name: "", dosage: "", instructions: "" },
+  ]);
+  const [rxSaving, setRxSaving] = useState(false);
+
   useEffect(() => {
     if (!authLoading && (!user || !isDoctor || !doctorProfile)) {
       navigate("/dashboard");
@@ -200,15 +210,6 @@ export default function DoctorDashboardPage() {
     }
   };
 
-  // Prescription dialog state
-  const [rxOpen, setRxOpen] = useState(false);
-  const [rxBooking, setRxBooking] = useState<any>(null);
-  const [rxDiagnosis, setRxDiagnosis] = useState("");
-  const [rxNotes, setRxNotes] = useState("");
-  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
-    { name: "", dosage: "", instructions: "" },
-  ]);
-  const [rxSaving, setRxSaving] = useState(false);
 
   const openRxDialog = (booking: any) => {
     setRxBooking(booking);
