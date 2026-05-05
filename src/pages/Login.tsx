@@ -63,9 +63,26 @@ export default function LoginPage() {
         if (isLogin) {
           const { error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
+          toast.success("تم تسجيل الدخول بنجاح! 🎉");
+          navigate("/dashboard");
         } else {
           const normalizedPhoneVal = phone ? normalizePhone(phone) : null;
-          const { error } = await supabase.auth.signUp({
+
+          // Check phone uniqueness before signup
+          if (normalizedPhoneVal) {
+            const { data: phoneExists } = await supabase
+              .from("profiles")
+              .select("user_id")
+              .eq("phone", normalizedPhoneVal)
+              .maybeSingle();
+            if (phoneExists) {
+              toast.error("رقم الهاتف مسجل بالفعل في حساب آخر");
+              setLoading(false);
+              return;
+            }
+          }
+
+          const { error, data } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -75,16 +92,21 @@ export default function LoginPage() {
           });
           if (error) throw error;
 
-          // If phone provided during email registration, link it to profile
+          // If phone provided during email registration, link it
           if (normalizedPhoneVal) {
-            // The profile will be created by trigger; we update phone via edge function
             supabase.functions.invoke("phone-auth", {
               body: { action: "link_phone", email, phone: normalizedPhoneVal },
-            }).catch(() => {}); // non-blocking
+            }).catch(() => {});
+          }
+
+          // Check if email confirmation is needed
+          if (data.user && !data.session) {
+            toast.success("تم إنشاء الحساب! تحقق من بريدك الإلكتروني لتأكيد الحساب 📧");
+          } else {
+            toast.success("تم إنشاء الحساب بنجاح! 🎉");
+            navigate("/dashboard");
           }
         }
-        toast.success(isLogin ? "تم تسجيل الدخول بنجاح! 🎉" : "تم إنشاء الحساب بنجاح! 🎉");
-        navigate("/dashboard");
       } else {
         // Phone flow with OTP
         if (!otpSent) {
