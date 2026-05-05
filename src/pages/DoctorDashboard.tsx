@@ -210,15 +210,6 @@ export default function DoctorDashboardPage() {
     }
   };
 
-  // Prescription dialog state
-  const [rxOpen, setRxOpen] = useState(false);
-  const [rxBooking, setRxBooking] = useState<any>(null);
-  const [rxDiagnosis, setRxDiagnosis] = useState("");
-  const [rxNotes, setRxNotes] = useState("");
-  const [rxMeds, setRxMeds] = useState<{ name: string; dosage: string; instructions: string }[]>([
-    { name: "", dosage: "", instructions: "" },
-  ]);
-  const [rxSaving, setRxSaving] = useState(false);
 
   const openRxDialog = (booking: any) => {
     setRxBooking(booking);
