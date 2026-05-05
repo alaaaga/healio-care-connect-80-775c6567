@@ -81,13 +81,33 @@ export default function ProfilePage() {
     if (!user) return;
     setSaving(true);
     const normalizedPhone = phone.trim() ? normalizePhone(phone.trim()) : "";
+
+    // Check phone uniqueness before saving
+    if (normalizedPhone) {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("phone", normalizedPhone)
+        .neq("user_id", user.id)
+        .maybeSingle();
+      if (existing) {
+        setSaving(false);
+        toast.error("رقم الهاتف مسجل بالفعل في حساب آخر");
+        return;
+      }
+    }
+
     const { error } = await supabase.from("profiles").update({
       full_name: fullName.trim(),
       phone: normalizedPhone,
     }).eq("user_id", user.id);
     setSaving(false);
     if (error) {
-      toast.error("حدث خطأ في الحفظ");
+      if (error.message?.includes("idx_profiles_phone_unique")) {
+        toast.error("رقم الهاتف مسجل بالفعل في حساب آخر");
+      } else {
+        toast.error("حدث خطأ في الحفظ");
+      }
     } else {
       setPhone(normalizedPhone);
       toast.success("تم حفظ البيانات بنجاح — يمكنك الآن الدخول بالإيميل أو الهاتف");
