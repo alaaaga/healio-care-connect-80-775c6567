@@ -88,6 +88,9 @@ export default function AdminPage() {
   const [linkDoctorDialogOpen, setLinkDoctorDialogOpen] = useState(false);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [selectedDoctorToLink, setSelectedDoctorToLink] = useState("");
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banUserId, setBanUserId] = useState<string | null>(null);
+  const [banDuration, setBanDuration] = useState("7"); // days
 
   // Doctor form
   const [docForm, setDocForm] = useState({ name: "", specialty: "", location: "", price: 0, bio: "" });
