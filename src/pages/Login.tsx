@@ -119,59 +119,40 @@ export default function LoginPage() {
         }
         const normalizedPhone = normalizePhone(phone);
 
-        if (isLogin) {
-          // Login with phone: edge function verifies OTP and returns magic link token
-          const { data: result, error: fnErr } = await supabase.functions.invoke("phone-auth", {
-            body: { action: "login_with_phone", phone: normalizedPhone, code: otp },
-          });
+        const actionName = isLogin ? "login_with_phone" : "register_with_phone";
+        const bodyPayload: any = { action: actionName, phone: normalizedPhone, code: otp };
+        if (!isLogin) bodyPayload.full_name = fullName || `مستخدم ${normalizedPhone.slice(-4)}`;
 
-          if (fnErr) throw fnErr;
-          if (result?.error === "no_account_for_phone") {
-            toast.error("لا يوجد حساب مرتبط بهذا الرقم. سجل حساب جديد أولاً أو أضف رقمك في ملفك الشخصي.");
-            return;
-          }
-          if (result?.error === "invalid_otp") {
-            toast.error("الكود غير صحيح أو منتهي الصلاحية");
-            return;
-          }
-          if (result?.error) throw new Error(result.error);
+        const { data: result, error: fnErr } = await supabase.functions.invoke("phone-auth", {
+          body: bodyPayload,
+        });
 
-          // Use the token_hash to verify and get session
-          const { error: verifyErr } = await supabase.auth.verifyOtp({
-            email: result.email,
-            token: result.token_hash,
-            type: "magiclink",
-          });
-          if (verifyErr) throw verifyErr;
-        } else {
-          // Register with phone: create account via edge function
-          const { data: result, error: fnErr } = await supabase.functions.invoke("phone-auth", {
-            body: {
-              action: "register_with_phone",
-              phone: normalizedPhone,
-              code: otp,
-              full_name: fullName || `مستخدم ${normalizedPhone.slice(-4)}`,
-            },
-          });
-
-          if (fnErr) throw fnErr;
-          if (result?.error === "phone_already_registered") {
-            toast.error("هذا الرقم مسجل بالفعل. جرب تسجيل الدخول.");
-            return;
-          }
-          if (result?.error === "invalid_otp") {
-            toast.error("الكود غير صحيح أو منتهي الصلاحية");
-            return;
-          }
-          if (result?.error) throw new Error(result.error);
-
-          const { error: verifyErr } = await supabase.auth.verifyOtp({
-            email: result.email,
-            token: result.token_hash,
-            type: "magiclink",
-          });
-          if (verifyErr) throw verifyErr;
+        if (fnErr) throw fnErr;
+        if (result?.error === "no_account_for_phone") {
+          toast.error("لا يوجد حساب مرتبط بهذا الرقم. سجل حساب جديد أولاً أو أضف رقمك في ملفك الشخصي.");
+          return;
         }
+        if (result?.error === "phone_already_registered") {
+          toast.error("هذا الرقم مسجل بالفعل. جرب تسجيل الدخول.");
+          return;
+        }
+        if (result?.error === "invalid_otp") {
+          toast.error("الكود غير صحيح أو منتهي الصلاحية");
+          return;
+        }
+        if (result?.error === "user_banned") {
+          const banDate = new Date(result.banned_until).toLocaleDateString("ar-EG");
+          toast.error(`حسابك محظور حتى ${banDate}`);
+          return;
+        }
+        if (result?.error) throw new Error(result.error);
+
+        // Sign in with temporary password
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: result.email,
+          password: result.temp_password,
+        });
+        if (signInErr) throw signInErr;
 
         toast.success("تم التحقق وتسجيل الدخول بنجاح! 🎉");
         navigate("/dashboard");
