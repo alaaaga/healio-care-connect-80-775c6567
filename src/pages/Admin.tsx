@@ -1295,23 +1295,43 @@ export default function AdminPage() {
                               ) : (
                                 <span className="text-muted-foreground text-xs">—</span>
                               )}
+                            <TableCell>
+                              {p.banned_until && new Date(p.banned_until) > new Date() ? (
+                                <Badge className="bg-destructive/10 text-destructive border-0">
+                                  محظور حتى {new Date(p.banned_until).toLocaleDateString("ar-EG")}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-medical-green/10 text-medical-green border-0">نشط</Badge>
+                              )}
                             </TableCell>
+                            {/* ... existing role & doctor cells ... */}
                             <TableCell>{new Date(p.created_at).toLocaleDateString("ar-EG")}</TableCell>
                             <TableCell>
-                              {linkedDoctor && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive text-xs"
-                                  onClick={async () => {
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {linkedDoctor && (
+                                  <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={async () => {
                                     await supabase.from("doctors").update({ user_id: null }).eq("id", linkedDoctor.id);
                                     setDoctors((prev) => prev.map((d) => d.id === linkedDoctor.id ? { ...d, user_id: null } : d));
                                     toast.success("تم فك ربط الطبيب");
-                                  }}
-                                >
-                                  فك الربط
+                                  }}>فك الربط</Button>
+                                )}
+                                {p.banned_until && new Date(p.banned_until) > new Date() ? (
+                                  <Button variant="ghost" size="sm" className="text-medical-green text-xs gap-1" onClick={() => unbanUser(p.user_id)}>
+                                    <CheckCircle2 className="w-3 h-3" />رفع الحظر
+                                  </Button>
+                                ) : (
+                                  <Button variant="ghost" size="sm" className="text-yellow-600 text-xs gap-1" onClick={() => {
+                                    setBanUserId(p.user_id);
+                                    setBanDuration("7");
+                                    setBanDialogOpen(true);
+                                  }}>
+                                    <Ban className="w-3 h-3" />حظر
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="sm" className="text-destructive text-xs gap-1" onClick={() => deleteUser(p.user_id)}>
+                                  <UserX className="w-3 h-3" />حذف
                                 </Button>
-                              )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
