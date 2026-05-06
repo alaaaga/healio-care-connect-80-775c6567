@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, Calendar, FileText, Stethoscope, TrendingUp, CheckCircle2, Clock, XCircle,
   Plus, Trash2, Edit, Shield, Pill, Search, Upload, Image, Tag, Download, BarChart3,
-  CreditCard, Banknote, Ticket, Percent
+  CreditCard, Banknote, Ticket, Percent, Ban, UserX
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +88,9 @@ export default function AdminPage() {
   const [linkDoctorDialogOpen, setLinkDoctorDialogOpen] = useState(false);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [selectedDoctorToLink, setSelectedDoctorToLink] = useState("");
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banUserId, setBanUserId] = useState<string | null>(null);
+  const [banDuration, setBanDuration] = useState("7"); // days
 
   // Doctor form
   const [docForm, setDocForm] = useState({ name: "", specialty: "", location: "", price: 0, bio: "" });
@@ -475,6 +478,37 @@ export default function AdminPage() {
     await supabase.from("coupons").update({ is_active: isActive }).eq("id", id);
     setCoupons((prev) => prev.map((c) => c.id === id ? { ...c, is_active: isActive } : c));
     toast.success(isActive ? "تم تفعيل الكوبون" : "تم إيقاف الكوبون");
+  };
+
+  const banUser = async (userId: string, days: number) => {
+    const bannedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "ban_user", user_id: userId, banned_until: bannedUntil },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ في حظر المستخدم"); return; }
+    setProfiles((prev) => prev.map((p) => p.user_id === userId ? { ...p, banned_until: bannedUntil } : p));
+    toast.success(`تم حظر المستخدم لمدة ${days} يوم`);
+    setBanDialogOpen(false);
+  };
+
+  const unbanUser = async (userId: string) => {
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "ban_user", user_id: userId, banned_until: null },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ"); return; }
+    setProfiles((prev) => prev.map((p) => p.user_id === userId ? { ...p, banned_until: null } : p));
+    toast.success("تم رفع الحظر عن المستخدم");
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المستخدم نهائياً؟")) return;
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "delete_user", user_id: userId },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ في حذف المستخدم"); return; }
+    setProfiles((prev) => prev.filter((p) => p.user_id !== userId));
+    setUserRoles((prev) => prev.filter((r) => r.user_id !== userId));
+    toast.success("تم حذف المستخدم نهائياً");
   };
 
   const filteredBookings = bookingFilter === "all" ? bookings : bookings.filter((b) => b.status === bookingFilter);
@@ -1196,9 +1230,9 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead className="text-right">الاسم</TableHead>
                       <TableHead className="text-right">الموبايل</TableHead>
+                      <TableHead className="text-right">الحالة</TableHead>
                       <TableHead className="text-right">الصلاحية</TableHead>
                       <TableHead className="text-right">طبيب مرتبط</TableHead>
-                      <TableHead className="text-right">تاريخ التسجيل</TableHead>
                       <TableHead className="text-right">إجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1262,22 +1296,43 @@ export default function AdminPage() {
                                 <span className="text-muted-foreground text-xs">—</span>
                               )}
                             </TableCell>
+                            <TableCell>
+                              {p.banned_until && new Date(p.banned_until) > new Date() ? (
+                                <Badge className="bg-destructive/10 text-destructive border-0">
+                                  محظور حتى {new Date(p.banned_until).toLocaleDateString("ar-EG")}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-medical-green/10 text-medical-green border-0">نشط</Badge>
+                              )}
+                            </TableCell>
+                            {/* ... existing role & doctor cells ... */}
                             <TableCell>{new Date(p.created_at).toLocaleDateString("ar-EG")}</TableCell>
                             <TableCell>
-                              {linkedDoctor && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive text-xs"
-                                  onClick={async () => {
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {linkedDoctor && (
+                                  <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={async () => {
                                     await supabase.from("doctors").update({ user_id: null }).eq("id", linkedDoctor.id);
                                     setDoctors((prev) => prev.map((d) => d.id === linkedDoctor.id ? { ...d, user_id: null } : d));
                                     toast.success("تم فك ربط الطبيب");
-                                  }}
-                                >
-                                  فك الربط
+                                  }}>فك الربط</Button>
+                                )}
+                                {p.banned_until && new Date(p.banned_until) > new Date() ? (
+                                  <Button variant="ghost" size="sm" className="text-medical-green text-xs gap-1" onClick={() => unbanUser(p.user_id)}>
+                                    <CheckCircle2 className="w-3 h-3" />رفع الحظر
+                                  </Button>
+                                ) : (
+                                  <Button variant="ghost" size="sm" className="text-yellow-600 text-xs gap-1" onClick={() => {
+                                    setBanUserId(p.user_id);
+                                    setBanDuration("7");
+                                    setBanDialogOpen(true);
+                                  }}>
+                                    <Ban className="w-3 h-3" />حظر
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="sm" className="text-destructive text-xs gap-1" onClick={() => deleteUser(p.user_id)}>
+                                  <UserX className="w-3 h-3" />حذف
                                 </Button>
-                              )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -1316,6 +1371,35 @@ export default function AdminPage() {
                       }}
                     >
                       ربط
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Ban User Dialog */}
+              <Dialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader><DialogTitle className="font-display">حظر مستخدم</DialogTitle></DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>مدة الحظر (بالأيام)</Label>
+                      <Select value={banDuration} onValueChange={setBanDuration}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">يوم واحد</SelectItem>
+                          <SelectItem value="3">3 أيام</SelectItem>
+                          <SelectItem value="7">أسبوع</SelectItem>
+                          <SelectItem value="30">شهر</SelectItem>
+                          <SelectItem value="365">سنة</SelectItem>
+                          <SelectItem value="36500">دائم</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      className="w-full bg-destructive text-destructive-foreground"
+                      onClick={() => banUserId && banUser(banUserId, parseInt(banDuration))}
+                    >
+                      <Ban className="w-4 h-4 ml-2" />تأكيد الحظر
                     </Button>
                   </div>
                 </DialogContent>
