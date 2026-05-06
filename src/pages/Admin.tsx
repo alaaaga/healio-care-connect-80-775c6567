@@ -1230,9 +1230,9 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead className="text-right">الاسم</TableHead>
                       <TableHead className="text-right">الموبايل</TableHead>
+                      <TableHead className="text-right">الحالة</TableHead>
                       <TableHead className="text-right">الصلاحية</TableHead>
                       <TableHead className="text-right">طبيب مرتبط</TableHead>
-                      <TableHead className="text-right">تاريخ التسجيل</TableHead>
                       <TableHead className="text-right">إجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
