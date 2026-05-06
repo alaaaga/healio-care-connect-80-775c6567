@@ -29,15 +29,12 @@ Deno.serve(async (req) => {
       if (!email || !phone) {
         return jsonResponse({ error: "Email and phone required" }, 400);
       }
-
-      // Check phone not already used by another account
       const { data: phoneOwner } = await supabase
         .from("profiles")
         .select("user_id")
         .eq("phone", phone)
         .maybeSingle();
 
-      // Find user by email
       const { data: { users }, error: listErr } = await supabase.auth.admin.listUsers();
       if (listErr) throw listErr;
       const user = users.find((u: any) => u.email === email);
@@ -66,7 +63,7 @@ Deno.serve(async (req) => {
 
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("user_id")
+        .select("user_id, banned_until")
         .eq("phone", phone)
         .maybeSingle();
 
@@ -74,23 +71,29 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "no_account_for_phone" }, 404);
       }
 
+      // Check ban
+      if (profileData.banned_until && new Date(profileData.banned_until) > new Date()) {
+        return jsonResponse({ error: "user_banned", banned_until: profileData.banned_until }, 403);
+      }
+
       const { data: { user }, error: getUserErr } = await supabase.auth.admin.getUserById(profileData.user_id);
       if (getUserErr || !user) {
         return jsonResponse({ error: "user_not_found" }, 404);
       }
 
-      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-        type: "magiclink",
-        email: user.email!,
+      // Set a temporary password and return credentials for signInWithPassword
+      const tempPass = `TMP-${crypto.randomUUID()}`;
+      const { error: updateErr } = await supabase.auth.admin.updateUser(profileData.user_id, {
+        password: tempPass,
       });
-      if (linkErr || !linkData) {
+      if (updateErr) {
         return jsonResponse({ error: "failed_to_generate_session" }, 500);
       }
 
       return jsonResponse({
         success: true,
         email: user.email,
-        token_hash: linkData.properties.hashed_token,
+        temp_password: tempPass,
       });
     }
 
@@ -107,7 +110,6 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "invalid_otp" }, 401);
       }
 
-      // Check phone uniqueness
       const { data: existing } = await supabase
         .from("profiles")
         .select("user_id")
@@ -118,11 +120,11 @@ Deno.serve(async (req) => {
       }
 
       const syntheticEmail = `${phone.replace(/\D/g, "")}@phone.medicare.local`;
-      const syntheticPassword = `Ph-${phone.replace(/\D/g, "")}-MC2026`;
+      const tempPass = `TMP-${crypto.randomUUID()}`;
 
       const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
         email: syntheticEmail,
-        password: syntheticPassword,
+        password: tempPass,
         email_confirm: true,
         user_metadata: { full_name, phone },
       });
@@ -130,19 +132,25 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: createErr.message }, 500);
       }
 
-      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-        type: "magiclink",
-        email: syntheticEmail,
-      });
-      if (linkErr || !linkData) {
-        return jsonResponse({ error: "failed_to_generate_session" }, 500);
-      }
-
       return jsonResponse({
         success: true,
         email: syntheticEmail,
-        token_hash: linkData.properties.hashed_token,
+        temp_password: tempPass,
       });
+    }
+
+    // ── Ban user ──
+    if (action === "ban_user") {
+      const { user_id, banned_until: banUntil } = await req.json().catch(() => ({ user_id: null, banned_until: null }));
+      // Re-parse from original body
+      const body = { user_id: arguments[0]?.user_id, banned_until: arguments[0]?.banned_until };
+    }
+
+    // ── Delete user ──
+    if (action === "delete_user") {
+      if (!email && !phone) {
+        // We need user_id from the body
+      }
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
