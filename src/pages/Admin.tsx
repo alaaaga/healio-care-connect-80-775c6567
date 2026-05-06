@@ -480,6 +480,37 @@ export default function AdminPage() {
     toast.success(isActive ? "تم تفعيل الكوبون" : "تم إيقاف الكوبون");
   };
 
+  const banUser = async (userId: string, days: number) => {
+    const bannedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "ban_user", user_id: userId, banned_until: bannedUntil },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ في حظر المستخدم"); return; }
+    setProfiles((prev) => prev.map((p) => p.user_id === userId ? { ...p, banned_until: bannedUntil } : p));
+    toast.success(`تم حظر المستخدم لمدة ${days} يوم`);
+    setBanDialogOpen(false);
+  };
+
+  const unbanUser = async (userId: string) => {
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "ban_user", user_id: userId, banned_until: null },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ"); return; }
+    setProfiles((prev) => prev.map((p) => p.user_id === userId ? { ...p, banned_until: null } : p));
+    toast.success("تم رفع الحظر عن المستخدم");
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المستخدم نهائياً؟")) return;
+    const { data, error } = await supabase.functions.invoke("phone-auth", {
+      body: { action: "delete_user", user_id: userId },
+    });
+    if (error || data?.error) { toast.error("حدث خطأ في حذف المستخدم"); return; }
+    setProfiles((prev) => prev.filter((p) => p.user_id !== userId));
+    setUserRoles((prev) => prev.filter((r) => r.user_id !== userId));
+    toast.success("تم حذف المستخدم نهائياً");
+  };
+
   const filteredBookings = bookingFilter === "all" ? bookings : bookings.filter((b) => b.status === bookingFilter);
 
   if (authLoading || loadingData) {
