@@ -1375,6 +1375,35 @@ export default function AdminPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              {/* Ban User Dialog */}
+              <Dialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader><DialogTitle className="font-display">حظر مستخدم</DialogTitle></DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>مدة الحظر (بالأيام)</Label>
+                      <Select value={banDuration} onValueChange={setBanDuration}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">يوم واحد</SelectItem>
+                          <SelectItem value="3">3 أيام</SelectItem>
+                          <SelectItem value="7">أسبوع</SelectItem>
+                          <SelectItem value="30">شهر</SelectItem>
+                          <SelectItem value="365">سنة</SelectItem>
+                          <SelectItem value="36500">دائم</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      className="w-full bg-destructive text-destructive-foreground"
+                      onClick={() => banUserId && banUser(banUserId, parseInt(banDuration))}
+                    >
+                      <Ban className="w-4 h-4 ml-2" />تأكيد الحظر
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           </Tabs>
         </div>
