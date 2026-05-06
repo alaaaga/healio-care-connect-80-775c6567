@@ -1295,6 +1295,7 @@ export default function AdminPage() {
                               ) : (
                                 <span className="text-muted-foreground text-xs">—</span>
                               )}
+                            </TableCell>
                             <TableCell>
                               {p.banned_until && new Date(p.banned_until) > new Date() ? (
                                 <Badge className="bg-destructive/10 text-destructive border-0">
