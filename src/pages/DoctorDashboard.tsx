@@ -199,7 +199,7 @@ export default function DoctorDashboardPage() {
           supabase.from("bookings").update({ 
             queue_position: newPos, 
             estimated_wait: newWait 
-          }).eq("id", item.id)
+          }).eq("id", item.id).then()
         );
         const bIdx = newBookings.findIndex((b) => b.id === item.id);
         if (bIdx >= 0) {
