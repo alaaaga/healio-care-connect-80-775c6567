@@ -187,7 +187,6 @@ export default function DoctorDashboardPage() {
       )
       .sort((a, b) => (a.queue_position || 999) - (b.queue_position || 999));
 
-    const updates: Promise<any>[] = [];
     const newBookings = [...bookings];
 
     for (let idx = 0; idx < queueItems.length; idx++) {
