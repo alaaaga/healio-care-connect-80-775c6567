@@ -54,22 +54,22 @@ Deno.serve(async (req) => {
       const { data: otpValid, error: otpErr } = await supabase.rpc("verify_phone_otp", {
         _phone: phone, _code: code,
       });
-      if (otpErr || !otpValid) return jsonResponse({ error: "invalid_otp" }, 401);
+      if (otpErr || !otpValid) return jsonResponse({ error: "invalid_otp" });
 
       const { data: profileData } = await supabase
         .from("profiles").select("user_id, banned_until").eq("phone", phone).maybeSingle();
 
-      if (!profileData) return jsonResponse({ error: "no_account_for_phone" }, 404);
+      if (!profileData) return jsonResponse({ error: "no_account_for_phone" });
 
       if (profileData.banned_until && new Date(profileData.banned_until) > new Date()) {
-        return jsonResponse({ error: "user_banned", banned_until: profileData.banned_until }, 403);
+        return jsonResponse({ error: "user_banned", banned_until: profileData.banned_until });
       }
 
       const { data: { user }, error: getUserErr } = await supabase.auth.admin.getUserById(profileData.user_id);
-      if (getUserErr || !user) return jsonResponse({ error: "user_not_found" }, 404);
+      if (getUserErr || !user) return jsonResponse({ error: "user_not_found" });
 
       const tempPass = `TMP-${crypto.randomUUID()}`;
-      const { error: updateErr } = await supabase.auth.admin.updateUser(profileData.user_id, { password: tempPass });
+      const { error: updateErr } = await supabase.auth.admin.updateUserById(profileData.user_id, { password: tempPass });
       if (updateErr) return jsonResponse({ error: "failed_to_generate_session" }, 500);
 
       return jsonResponse({ success: true, email: user.email, temp_password: tempPass });
@@ -83,11 +83,11 @@ Deno.serve(async (req) => {
       const { data: otpValid, error: otpErr } = await supabase.rpc("verify_phone_otp", {
         _phone: phone, _code: code,
       });
-      if (otpErr || !otpValid) return jsonResponse({ error: "invalid_otp" }, 401);
+      if (otpErr || !otpValid) return jsonResponse({ error: "invalid_otp" });
 
       const { data: existing } = await supabase
         .from("profiles").select("user_id").eq("phone", phone).maybeSingle();
-      if (existing) return jsonResponse({ error: "phone_already_registered" }, 409);
+      if (existing) return jsonResponse({ error: "phone_already_registered" });
 
       const syntheticEmail = `${phone.replace(/\D/g, "")}@phone.medicare.local`;
       const tempPass = `TMP-${crypto.randomUUID()}`;
@@ -112,9 +112,9 @@ Deno.serve(async (req) => {
 
       // Also disable auth user if banning
       if (banned_until) {
-        await supabase.auth.admin.updateUser(user_id, { ban_duration: "876000h" }); // ~100 years, we handle real expiry in app
+        await supabase.auth.admin.updateUserById(user_id, { ban_duration: "876000h" }); // ~100 years, we handle real expiry in app
       } else {
-        await supabase.auth.admin.updateUser(user_id, { ban_duration: "none" });
+        await supabase.auth.admin.updateUserById(user_id, { ban_duration: "none" });
       }
 
       return jsonResponse({ success: true });
