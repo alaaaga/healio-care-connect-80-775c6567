@@ -145,7 +145,24 @@ export default function LoginPage() {
           toast.error(`حسابك محظور حتى ${banDate}`);
           return;
         }
-        if (result?.error) throw new Error(result.error);
+        if (result?.error === "user_not_found") {
+          toast.error("لم يتم العثور على حساب بهذا الرقم. تأكد من الرقم أو سجل حساب جديد.");
+          return;
+        }
+        if (result?.error === "failed_to_generate_session") {
+          toast.error("حدث خطأ في إنشاء الجلسة. حاول مرة أخرى.");
+          return;
+        }
+        if (result?.error) {
+          const errorMap: Record<string, string> = {
+            "Email and phone required": "البريد الإلكتروني ورقم الهاتف مطلوبان",
+            "Phone and OTP code required": "رقم الهاتف وكود التحقق مطلوبان",
+            "Phone, code, and name required": "رقم الهاتف والكود والاسم مطلوبان",
+            "Invalid action": "إجراء غير صالح",
+          };
+          toast.error(errorMap[result.error] || "حدث خطأ غير متوقع. حاول مرة أخرى.");
+          return;
+        }
 
         // Sign in with temporary password
         const { error: signInErr } = await supabase.auth.signInWithPassword({
@@ -158,7 +175,16 @@ export default function LoginPage() {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "حدث خطأ. حاول مرة تانية.");
+      const msg = error.message || "";
+      const friendlyErrors: Record<string, string> = {
+        "Invalid login credentials": "بيانات تسجيل الدخول غير صحيحة. تأكد من البريد وكلمة المرور.",
+        "Email not confirmed": "البريد الإلكتروني غير مؤكد. تحقق من بريدك الوارد.",
+        "User already registered": "هذا البريد مسجل بالفعل. جرب تسجيل الدخول.",
+        "Signup requires a valid password": "كلمة المرور غير صالحة. استخدم كلمة مرور أقوى.",
+        "Password should be at least 6 characters": "كلمة المرور يجب أن تكون 6 أحرف على الأقل.",
+      };
+      const friendly = Object.entries(friendlyErrors).find(([key]) => msg.includes(key));
+      toast.error(friendly ? friendly[1] : (msg || "حدث خطأ. حاول مرة تانية."));
     } finally {
       setLoading(false);
     }
