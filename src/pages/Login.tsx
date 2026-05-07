@@ -175,7 +175,16 @@ export default function LoginPage() {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "حدث خطأ. حاول مرة تانية.");
+      const msg = error.message || "";
+      const friendlyErrors: Record<string, string> = {
+        "Invalid login credentials": "بيانات تسجيل الدخول غير صحيحة. تأكد من البريد وكلمة المرور.",
+        "Email not confirmed": "البريد الإلكتروني غير مؤكد. تحقق من بريدك الوارد.",
+        "User already registered": "هذا البريد مسجل بالفعل. جرب تسجيل الدخول.",
+        "Signup requires a valid password": "كلمة المرور غير صالحة. استخدم كلمة مرور أقوى.",
+        "Password should be at least 6 characters": "كلمة المرور يجب أن تكون 6 أحرف على الأقل.",
+      };
+      const friendly = Object.entries(friendlyErrors).find(([key]) => msg.includes(key));
+      toast.error(friendly ? friendly[1] : (msg || "حدث خطأ. حاول مرة تانية."));
     } finally {
       setLoading(false);
     }
