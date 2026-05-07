@@ -190,28 +190,24 @@ export default function DoctorDashboardPage() {
     const updates: Promise<any>[] = [];
     const newBookings = [...bookings];
 
-    queueItems.forEach((item, idx) => {
+    for (let idx = 0; idx < queueItems.length; idx++) {
+      const item = queueItems[idx];
       const newPos = idx + 1;
       const newWait = newPos > 1 ? `${(newPos - 1) * AVG_WAIT_MINUTES} دقيقة` : null;
       
       if (item.queue_position !== newPos || item.estimated_wait !== newWait) {
-        updates.push(
-          supabase.from("bookings").update({ 
-            queue_position: newPos, 
-            estimated_wait: newWait 
-          }).eq("id", item.id).then()
-        );
+        await supabase.from("bookings").update({ 
+          queue_position: newPos, 
+          estimated_wait: newWait 
+        }).eq("id", item.id);
         const bIdx = newBookings.findIndex((b) => b.id === item.id);
         if (bIdx >= 0) {
           newBookings[bIdx] = { ...newBookings[bIdx], queue_position: newPos, estimated_wait: newWait };
         }
       }
-    });
-
-    if (updates.length > 0) {
-      setBookings(newBookings);
-      await Promise.all(updates);
     }
+
+    setBookings(newBookings);
   }, [bookings]);
 
   const completeAndAdvance = async (booking: any) => {
