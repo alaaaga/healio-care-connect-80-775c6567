@@ -145,7 +145,24 @@ export default function LoginPage() {
           toast.error(`حسابك محظور حتى ${banDate}`);
           return;
         }
-        if (result?.error) throw new Error(result.error);
+        if (result?.error === "user_not_found") {
+          toast.error("لم يتم العثور على حساب بهذا الرقم. تأكد من الرقم أو سجل حساب جديد.");
+          return;
+        }
+        if (result?.error === "failed_to_generate_session") {
+          toast.error("حدث خطأ في إنشاء الجلسة. حاول مرة أخرى.");
+          return;
+        }
+        if (result?.error) {
+          const errorMap: Record<string, string> = {
+            "Email and phone required": "البريد الإلكتروني ورقم الهاتف مطلوبان",
+            "Phone and OTP code required": "رقم الهاتف وكود التحقق مطلوبان",
+            "Phone, code, and name required": "رقم الهاتف والكود والاسم مطلوبان",
+            "Invalid action": "إجراء غير صالح",
+          };
+          toast.error(errorMap[result.error] || "حدث خطأ غير متوقع. حاول مرة أخرى.");
+          return;
+        }
 
         // Sign in with temporary password
         const { error: signInErr } = await supabase.auth.signInWithPassword({
