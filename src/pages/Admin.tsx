@@ -125,6 +125,10 @@ export default function AdminPage() {
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<any>(null);
 
+  // User questions
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [qAnswerMap, setQAnswerMap] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
       navigate("/");
