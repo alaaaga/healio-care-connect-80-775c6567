@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, Calendar, FileText, Stethoscope, TrendingUp, CheckCircle2, Clock, XCircle,
   Plus, Trash2, Edit, Shield, Pill, Search, Upload, Image, Tag, Download, BarChart3,
-  CreditCard, Banknote, Ticket, Percent, Ban, UserX
+  CreditCard, Banknote, Ticket, Percent, Ban, UserX, MessageCircleQuestion, Send, EyeOff, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +125,10 @@ export default function AdminPage() {
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<any>(null);
 
+  // User questions
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [qAnswerMap, setQAnswerMap] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
       navigate("/");
@@ -135,7 +139,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user || !isAdmin) return;
     const fetchAll = async () => {
-      const [{ data: d }, { data: b }, { data: a }, { data: p }, { data: pr }, { data: o }, { data: ur }, { data: pay }, { data: coup }] = await Promise.all([
+      const [{ data: d }, { data: b }, { data: a }, { data: p }, { data: pr }, { data: o }, { data: ur }, { data: pay }, { data: coup }, { data: qs }] = await Promise.all([
         supabase.from("doctors").select("*").order("created_at", { ascending: false }),
         supabase.from("bookings").select("*, doctors(name, specialty)").order("created_at", { ascending: false }),
         supabase.from("articles").select("*").order("created_at", { ascending: false }),
@@ -145,6 +149,7 @@ export default function AdminPage() {
         supabase.from("user_roles").select("*").order("user_id"),
         supabase.from("payments").select("*, bookings(booking_date, doctors(name))").order("created_at", { ascending: false }),
         supabase.from("coupons").select("*").order("created_at", { ascending: false }),
+        supabase.from("user_questions").select("*").order("created_at", { ascending: false }),
       ]);
       const profileMap = new Map((p || []).map((prof: any) => [prof.user_id, prof.full_name]));
       const bookingsWithNames = (b || []).map((booking: any) => ({
@@ -163,6 +168,7 @@ export default function AdminPage() {
       setOffers(o || []);
       setUserRoles(ur || []);
       setCoupons(coup || []);
+      setQuestions(qs || []);
       const payWithNames = (pay || []).map((pm: any) => ({
         ...pm,
         patient_name: profileMap.get(pm.user_id) || "مستخدم",
@@ -602,6 +608,7 @@ export default function AdminPage() {
                 <TabsTrigger value="users" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Users className="w-4 h-4" /><span className="hidden sm:inline">المستخدمين</span><span className="sm:hidden">مستخدم</span></TabsTrigger>
                 <TabsTrigger value="payments" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">المدفوعات</span><span className="sm:hidden">دفع</span></TabsTrigger>
                 <TabsTrigger value="analytics" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">التحليلات</span><span className="sm:hidden">تحليل</span></TabsTrigger>
+                <TabsTrigger value="questions" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><MessageCircleQuestion className="w-4 h-4" /><span className="hidden sm:inline">الأسئلة</span><span className="sm:hidden">سؤال</span></TabsTrigger>
               </TabsList>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
@@ -1404,6 +1411,115 @@ export default function AdminPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+            </TabsContent>
+
+            {/* User Questions */}
+            <TabsContent value="questions">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h3 className="font-display font-bold text-foreground">أسئلة الزوار</h3>
+                <div className="text-sm text-muted-foreground">
+                  {questions.filter((q) => !q.answer).length} سؤال جديد · {questions.filter((q) => q.is_published).length} منشور
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {[
+                  { label: "إجمالي الأسئلة", value: questions.length, icon: MessageCircleQuestion, color: "text-primary" },
+                  { label: "بدون رد", value: questions.filter((q) => !q.answer).length, icon: Clock, color: "text-yellow-600" },
+                  { label: "تم الرد", value: questions.filter((q) => q.answer).length, icon: CheckCircle2, color: "text-medical-green" },
+                  { label: "منشورة", value: questions.filter((q) => q.is_published).length, icon: Eye, color: "text-medical-blue" },
+                ].map((stat) => (
+                  <div key={stat.label} className="glass-card rounded-2xl p-4 text-center">
+                    <stat.icon className={`w-5 h-5 ${stat.color} mx-auto mb-2`} />
+                    <p className="font-display font-bold text-lg text-foreground">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                {questions.length === 0 && (
+                  <div className="glass-card rounded-2xl p-12 text-center">
+                    <MessageCircleQuestion className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">لا توجد أسئلة بعد</p>
+                  </div>
+                )}
+                {questions.map((q) => (
+                  <div key={q.id} className="glass-card rounded-2xl p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-display font-semibold">{q.name}</span>
+                          {q.email && <span className="text-xs text-muted-foreground" dir="ltr">{q.email}</span>}
+                          {q.is_published ? (
+                            <Badge className="bg-medical-green/10 text-medical-green border-0 text-xs">منشور</Badge>
+                          ) : q.answer ? (
+                            <Badge className="bg-yellow-500/10 text-yellow-600 border-0 text-xs">تم الرد</Badge>
+                          ) : (
+                            <Badge className="bg-primary/10 text-primary border-0 text-xs">جديد</Badge>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{new Date(q.created_at).toLocaleString("ar-EG")}</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-destructive gap-1" onClick={async () => {
+                        if (!confirm("حذف السؤال؟")) return;
+                        await supabase.from("user_questions").delete().eq("id", q.id);
+                        setQuestions((prev) => prev.filter((x) => x.id !== q.id));
+                        toast.success("تم الحذف");
+                      }}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm leading-relaxed mb-3 bg-muted/40 rounded-lg p-3">{q.question}</p>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">الرد</Label>
+                      <Textarea
+                        rows={3}
+                        placeholder="اكتب الرد هنا..."
+                        value={qAnswerMap[q.id] ?? q.answer ?? ""}
+                        onChange={(e) => setQAnswerMap({ ...qAnswerMap, [q.id]: e.target.value })}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" className="gradient-hero-bg text-primary-foreground border-0 gap-1" onClick={async () => {
+                          const answer = (qAnswerMap[q.id] ?? q.answer ?? "").trim();
+                          if (!answer) { toast.error("اكتب الرد أولاً"); return; }
+                          const { error } = await supabase.from("user_questions").update({
+                            answer, answered_at: new Date().toISOString(), is_published: true,
+                          }).eq("id", q.id);
+                          if (error) { toast.error("حدث خطأ"); return; }
+                          setQuestions((prev) => prev.map((x) => x.id === q.id ? { ...x, answer, is_published: true, answered_at: new Date().toISOString() } : x));
+                          toast.success("تم الرد ونشر السؤال");
+                        }}>
+                          <Send className="w-4 h-4" /> رد ونشر
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          const answer = (qAnswerMap[q.id] ?? q.answer ?? "").trim();
+                          await supabase.from("user_questions").update({
+                            answer: answer || null,
+                            answered_at: answer ? new Date().toISOString() : null,
+                          }).eq("id", q.id);
+                          setQuestions((prev) => prev.map((x) => x.id === q.id ? { ...x, answer: answer || null } : x));
+                          toast.success("تم الحفظ كمسودة");
+                        }}>حفظ مسودة</Button>
+                        {q.is_published ? (
+                          <Button size="sm" variant="outline" className="gap-1" onClick={async () => {
+                            await supabase.from("user_questions").update({ is_published: false }).eq("id", q.id);
+                            setQuestions((prev) => prev.map((x) => x.id === q.id ? { ...x, is_published: false } : x));
+                            toast.success("تم إخفاء السؤال");
+                          }}><EyeOff className="w-4 h-4" /> إخفاء</Button>
+                        ) : q.answer ? (
+                          <Button size="sm" variant="outline" className="gap-1 text-medical-green border-medical-green/30" onClick={async () => {
+                            await supabase.from("user_questions").update({ is_published: true }).eq("id", q.id);
+                            setQuestions((prev) => prev.map((x) => x.id === q.id ? { ...x, is_published: true } : x));
+                            toast.success("تم النشر");
+                          }}><Eye className="w-4 h-4" /> نشر</Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </TabsContent>
           </Tabs>
         </div>
