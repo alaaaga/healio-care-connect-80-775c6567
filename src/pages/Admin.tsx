@@ -608,6 +608,7 @@ export default function AdminPage() {
                 <TabsTrigger value="users" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Users className="w-4 h-4" /><span className="hidden sm:inline">المستخدمين</span><span className="sm:hidden">مستخدم</span></TabsTrigger>
                 <TabsTrigger value="payments" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">المدفوعات</span><span className="sm:hidden">دفع</span></TabsTrigger>
                 <TabsTrigger value="analytics" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">التحليلات</span><span className="sm:hidden">تحليل</span></TabsTrigger>
+                <TabsTrigger value="questions" className="rounded-lg gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"><MessageCircleQuestion className="w-4 h-4" /><span className="hidden sm:inline">الأسئلة</span><span className="sm:hidden">سؤال</span></TabsTrigger>
               </TabsList>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
