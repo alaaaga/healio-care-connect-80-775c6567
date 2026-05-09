@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, Calendar, FileText, Stethoscope, TrendingUp, CheckCircle2, Clock, XCircle,
   Plus, Trash2, Edit, Shield, Pill, Search, Upload, Image, Tag, Download, BarChart3,
-  CreditCard, Banknote, Ticket, Percent, Ban, UserX
+  CreditCard, Banknote, Ticket, Percent, Ban, UserX, MessageCircleQuestion, Send, EyeOff, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
