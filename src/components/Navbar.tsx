@@ -19,6 +19,8 @@ const navLinks = [
   { name: "الأطباء", path: "/doctors" },
   { name: "حجز موعد", path: "/booking" },
   { name: "المقالات", path: "/articles" },
+  { name: "من نحن", path: "/about" },
+  { name: "الأسئلة الشائعة", path: "/faq" },
   { name: "تواصل معنا", path: "/contact" },
 ];
 

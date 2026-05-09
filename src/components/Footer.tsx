@@ -33,6 +33,8 @@ export default function Footer() {
                 { label: "الأطباء", path: "/doctors" },
                 { label: "حجز موعد", path: "/booking" },
                 { label: "المقالات", path: "/articles" },
+                { label: "من نحن", path: "/about" },
+                { label: "الأسئلة الشائعة", path: "/faq" },
                 { label: "تواصل معنا", path: "/contact" },
               ].map((link) => (
                 <li key={link.label}>

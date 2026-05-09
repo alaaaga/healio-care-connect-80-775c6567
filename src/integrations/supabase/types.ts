@@ -503,6 +503,42 @@ export type Database = {
           },
         ]
       }
+      user_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_published: boolean
+          name: string
+          question: string
+          user_id: string | null
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_published?: boolean
+          name: string
+          question: string
+          user_id?: string | null
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_published?: boolean
+          name?: string
+          question?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
