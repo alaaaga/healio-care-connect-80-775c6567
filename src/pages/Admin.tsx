@@ -168,6 +168,7 @@ export default function AdminPage() {
       setOffers(o || []);
       setUserRoles(ur || []);
       setCoupons(coup || []);
+      setQuestions(qs || []);
       const payWithNames = (pay || []).map((pm: any) => ({
         ...pm,
         patient_name: profileMap.get(pm.user_id) || "مستخدم",
